@@ -233,9 +233,8 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
 // the columns root k checks at, from its telescope T's parameter j on:
 // a specialized parameter of a finite type (Quant, or a datatype whose
 // constructors have no fields) at each value, any other at an opaque
-// constant of its type, shared by the roots with it at that place so a
-// template they reach goes out once, which models read at its model (as
-// bend2 checks a template: its body holds at every argument)
+// constant of its type, one per place for all roots, which models read at
+// its model (as bend2 checks a template: its body holds at every argument)
 function root_cols(e: Safe, k: Name, T: HTerm, j: number): Cols[] {
   const sp = spec_of(e, k);
   const F = B.term_wnf(e.book, T);
