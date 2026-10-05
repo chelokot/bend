@@ -113,8 +113,7 @@ type Scope = { c: Bind[]; d: number; D: number; cols: Cols;
 // scope, each item's specialized parameters, the groups found (kept from
 // pass to pass), each template instance's template and ~ arguments (its
 // key in book.tmps), the items going out (outermost first, and as a set),
-// whether this pass grew a group, and each root constant by its type and
-// its rank among the root's parameters of that type
+// whether this pass grew a group, and the root constants by place and type
 type Safe = {
   book: Book;
   mb: Book;
@@ -198,7 +197,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
   const roots: Array<[Name, string]> = [];
   for (const k of [...book.order].filter((k, i) => book.order.lastIndexOf(k) === i && book.tlds[k].b !== true)) {
     try {
-      roots.push(...root_cols(e, k, book.tlds[k].T, 0, new Map()).map((cols): [Name, string] => [k, item_try(e, k, cols)]));
+      roots.push(...root_cols(e, k, book.tlds[k].T, 0).map((cols): [Name, string] => [k, item_try(e, k, cols)]));
     } catch (x) {
       if (!(x instanceof Scope_Error)) {
         throw x;
@@ -234,18 +233,16 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
 // the columns root k checks at, from its telescope T's parameter j on:
 // a specialized parameter of a finite type (Quant, or a datatype whose
 // constructors have no fields) at each value, any other at an opaque
-// constant of its type, which models read at its model (as bend2 checks a
-// template: its body holds at every argument). Roots share these constants
-// by type and rank, so a template reached from many roots goes out once;
-// ranks keep a root's parameters of one type apart
-function root_cols(e: Safe, k: Name, T: HTerm, j: number, ranks: ReadonlyMap<string, number>): Cols[] {
+// constant of its type, shared by the roots with it at that place so a
+// template they reach goes out once, which models read at its model (as
+// bend2 checks a template: its body holds at every argument)
+function root_cols(e: Safe, k: Name, T: HTerm, j: number): Cols[] {
   const sp = spec_of(e, k);
   const F = B.term_wnf(e.book, T);
   if (j === sp.length || F.$ !== "All") {
     return [[]];
   }
-  const at = (v: HTerm | null, next: ReadonlyMap<string, number> = ranks): Cols[] =>
-    root_cols(e, k, F.B(v ?? B.Var(F.k, j)), j + 1, next).map((cs) => [v, ...cs]);
+  const at = (v: HTerm | null): Cols[] => root_cols(e, k, F.B(v ?? B.Var(F.k, j)), j + 1).map((cs) => [v, ...cs]);
   if (!sp[j]) {
     return at(null);
   }
@@ -259,12 +256,10 @@ function root_cols(e: Safe, k: Name, T: HTerm, j: number, ranks: ReadonlyMap<str
   if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
     oos("a specialized parameter whose type names a parameter");
   }
-  const type = B.term_key(B.term_lower(F.A));
-  const rank = ranks.get(type) ?? 0;
-  const next = new Map(ranks).set(type, rank + 1);
-  const kept = e.consts.get(type + "\n" + String(rank));
+  const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
+  const kept = e.consts.get(key);
   if (kept !== undefined) {
-    return at(B.Ref(kept), next);
+    return at(B.Ref(kept));
   }
   let c = k + "~" + F.k;
   while (e.book.tlds[c] !== undefined) {
@@ -276,8 +271,8 @@ function root_cols(e: Safe, k: Name, T: HTerm, j: number, ranks: ReadonlyMap<str
   if (m !== null) {
     e.mb.tlds[c] = { ...def, v: m };
   }
-  e.consts.set(type + "\n" + String(rank), c);
-  return at(B.Ref(c), next);
+  e.consts.set(key, c);
+  return at(B.Ref(c));
 }
 
 // item_ref, with a failure kept as the item's reason
